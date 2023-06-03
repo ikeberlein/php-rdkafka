@@ -217,6 +217,80 @@ PHP_METHOD(RdKafka__KafkaConsumer, assign)
 }
 /* }}} */
 
+static void consumer_incremental_op(int assign, INTERNAL_FUNCTION_PARAMETERS) /* {{{ */
+{
+    HashTable *htopars = NULL;
+    rd_kafka_topic_partition_list_t *topics;
+    rd_kafka_error_t *err = NULL;
+    object_intern *intern;
+
+    if (zend_parse_parameters(ZEND_NUM_ARGS(), "h", &htopars) == FAILURE)
+    {
+        return;
+    }
+
+    if (!htopars) {
+        return;
+    }
+
+    intern = get_object(getThis());
+    if (!intern)
+    {
+        return;
+    }
+
+    topics = array_arg_to_kafka_topic_partition_list(1, htopars);
+    if (!topics)
+    {
+        return;
+    }
+
+    if (assign)
+    {
+        err = rd_kafka_incremental_assign(intern->rk, topics);
+    }
+    else
+    {
+        err = rd_kafka_incremental_unassign(intern->rk, topics);
+    }
+
+    if (topics)
+    {
+        rd_kafka_topic_partition_list_destroy(topics);
+    }
+
+    if (err)
+    {
+        zend_throw_exception(ce_kafka_exception, rd_kafka_error_string(err), 0);
+        rd_kafka_error_destroy(err);
+    }
+}
+/* }}} */
+
+/* {{{ proto void RdKafka\KafkaConsumer::assignIncremental([array $topics])
+    Incremental assignment of partitions to consume */
+ZEND_BEGIN_ARG_INFO_EX(arginfo_kafka_kafka_consumer_assignIncremental, 0, 0, 1)
+    ZEND_ARG_INFO(0, topic_partitions)
+ZEND_END_ARG_INFO()
+
+PHP_METHOD(RdKafka_KafkaConsumer, assignIncremental)
+{
+    consumer_incremental_op(1, INTERNAL_FUNCTION_PARAM_PASSTHRU);
+}
+/* }}} */
+
+/* {{{ proto void RdKafka\KafkaConsumer::unassignIncremental([array $topics])
+    Incremental remoke of partitions to consume */
+ZEND_BEGIN_ARG_INFO_EX(arginfo_kafka_kafka_consumer_unassignIncremental, 0, 0, 1)
+    ZEND_ARG_ARRAY_INFO(0, topic_partitions, 0)
+ZEND_END_ARG_INFO()
+
+PHP_METHOD(RdKafka_KafkaConsumer, unassignIncremental)
+{
+    consumer_incremental_op(0, INTERNAL_FUNCTION_PARAM_PASSTHRU);
+}
+/* }}} */
+
 /* {{{ proto array RdKafka\KafkaConsumer::getAssignment()
     Returns the current partition getAssignment */
 
@@ -881,6 +955,8 @@ PHP_METHOD(RdKafka__KafkaConsumer, resumePartitions)
 static const zend_function_entry fe[] = { /* {{{ */
     PHP_ME(RdKafka__KafkaConsumer, __construct, arginfo_kafka_kafka_consumer___construct, ZEND_ACC_PUBLIC)
     PHP_ME(RdKafka__KafkaConsumer, assign, arginfo_kafka_kafka_consumer_assign, ZEND_ACC_PUBLIC)
+    PHP_ME(RdKafka__KafkaConsumer, assign, arginfo_kafka_kafka_consumer_assignIncremental, ZEND_ACC_PUBLIC)
+    PHP_ME(RdKafka__KafkaConsumer, assign, arginfo_kafka_kafka_consumer_unassignIncremental, ZEND_ACC_PUBLIC)
     PHP_ME(RdKafka__KafkaConsumer, getAssignment, arginfo_kafka_kafka_consumer_getAssignment, ZEND_ACC_PUBLIC)
     PHP_ME(RdKafka__KafkaConsumer, commit, arginfo_kafka_kafka_consumer_commit, ZEND_ACC_PUBLIC)
     PHP_ME(RdKafka__KafkaConsumer, close, arginfo_kafka_kafka_consumer_close, ZEND_ACC_PUBLIC)
